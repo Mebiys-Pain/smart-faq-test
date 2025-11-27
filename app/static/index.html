@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart FAQ</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f0f2f5; }
+        .chat-card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 30px; }
+        
+        .upload-section { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+        .btn-upload { background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-upload:hover { background: #219150; }
+        
+        .input-group { display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; outline: none; }
+        input[type="text"]:focus { border-color: #3498db; }
+        
+        .btn-ask { background: #3498db; color: white; border: none; padding: 0 30px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .btn-ask:hover { background: #2980b9; }
+        .btn-ask:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+        #answer-box { margin-top: 25px; display: none; }
+        .answer-content { background: #e8f4fd; padding: 20px; border-radius: 10px; border-left: 5px solid #3498db; color: #2c3e50; line-height: 1.6; }
+        .sources { font-size: 0.85em; color: #7f8c8d; margin-top: 10px; text-align: right; }
+        
+        #loader { text-align: center; margin-top: 20px; display: none; color: #7f8c8d; }
+        #status-msg { margin-top: 10px; font-size: 0.9em; min-height: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="chat-card">
+    <h1>Умный FAQ Помощник</h1>
+    
+    <div class="upload-section">
+        <button class="btn-upload" onclick="uploadDocs()">📚 Обновить базу знаний (из PDF)</button>
+        <div id="status-msg"></div>
+    </div>
+
+    <div class="input-group">
+        <input type="text" id="question" placeholder="Введите ваш вопрос по документам..." onkeypress="handleEnter(event)">
+        <button class="btn-ask" onclick="askQuestion()" id="askBtn">Спросить</button>
+    </div>
+
+    <div id="loader">
+         Анализирую документы...
+    </div>
+    
+    <div id="answer-box">
+        <div class="answer-content" id="answer-text"></div>
+        <div class="sources" id="sources"></div>
+    </div>
+</div>
+
+<script>
+    async function uploadDocs() {
+        const msg = document.getElementById('status-msg');
+        msg.style.color = 'blue';
+        msg.innerText = "Загрузка и обработка файлов...";
+        
+        try {
+            const res = await fetch('/api/documents', { method: 'POST' });
+            const data = await res.json();
+            
+            if (data.status === 'success') {
+                msg.style.color = 'green';
+                msg.innerText = `Успешно! Загружено фрагментов: ${data.chunks}`;
+            } else {
+                msg.style.color = 'red';
+                msg.innerText = "Ошибка: " + (data.message || data.details);
+            }
+        } catch (e) {
+            msg.style.color = 'red';
+            msg.innerText = "Ошибка соединения с сервером";
+        }
+    }
+
+    async function askQuestion() {
+        const qInput = document.getElementById('question');
+        const text = qInput.value.trim();
+        if (!text) return;
+
+        // UI переключаем в режим загрузки
+        const btn = document.getElementById('askBtn');
+        const loader = document.getElementById('loader');
+        const ansBox = document.getElementById('answer-box');
+        
+        btn.disabled = true;
+        loader.style.display = 'block';
+        ansBox.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            });
+            const data = await res.json();
+            
+            // Показываем ответ
+            document.getElementById('answer-text').innerText = data.answer;
+            
+            // Источники
+            let sourceHtml = "";
+            if (data.sources && data.sources.length > 0) {
+                sourceHtml = "Источник: " + data.sources.join(", ");
+            }
+            if (data.cached) {
+                sourceHtml += " (Из кэша)";
+            }
+            document.getElementById('sources').innerText = sourceHtml;
+            
+            ansBox.style.display = 'block';
+        } catch (e) {
+            alert("Ошибка получения ответа. Проверьте консоль.");
+        } finally {
+            btn.disabled = false;
+            loader.style.display = 'none';
+        }
+    }
+
+    function handleEnter(e) {
+        if (e.key === 'Enter') askQuestion();
+    }
+</script>
+
+</body>
+</html>

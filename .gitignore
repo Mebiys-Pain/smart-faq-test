@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+env/
+.idea/
+.vscode/
+postgres_data/
+qdrant_data/
+documents/*
+!documents/.gitkeep
